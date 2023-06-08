@@ -1,0 +1,55 @@
+name: 'Setup bpftool'
+description: 'Install bpftool static binaries'
+branding:
+  icon: 'download'
+  color: 'gray-dark'
+inputs:
+  version:
+    description: 'Version of bpftool'
+    required: false
+    default: 'latest'
+  path:
+    description: 'Installation path'
+    required: false
+    default: '/usr/local/bin'
+runs:
+  using: "composite"
+  steps:
+    - name: detect arch
+      id: arch
+      shell: bash
+      run: |
+        case $(uname -m) in
+          x86_64) echo "arch=amd64" >> $GITHUB_OUTPUT;;
+          aarch64) echo "arch=arm64" >> $GITHUB_OUTPUT;;
+          *) echo "unsupported architecture: $(uname -m)"; exit 1;;
+        esac
+
+    - name: retrieve version
+      id: version
+      shell: bash
+      run: |
+        if [[ "${{ inputs.version }}" = "latest" ]]; then
+          echo "version=$(curl -s https://api.github.com/repos/libbpf/bpftool/releases/latest | jq -r '.tag_name')" >> $GITHUB_OUTPUT
+        else
+          echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: cache download
+      id: cache-download
+      uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8 # v3.3.1
+      with:
+        path: ${{ inputs.path }}/bpftool
+        key: bpftool-${{ steps.version.outputs.version }}-${{ steps.arch.outputs.arch }}
+
+    - name: download
+      if: steps.cache-download.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        curl -s -L https://github.com/libbpf/bpftool/releases/download/${{ steps.version.outputs.version }}/bpftool-${{ steps.version.outputs.version }}-${{ steps.arch.outputs.arch }}.tar.gz | tar xz
+        chmod +x bpftool
+        mv bpftool ${{ inputs.path }}
+
+    - name: check installation
+      shell: bash
+      run: bpftool version
