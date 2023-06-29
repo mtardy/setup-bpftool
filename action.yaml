@@ -22,18 +22,37 @@ runs:
         case $(uname -m) in
           x86_64) echo "arch=amd64" >> $GITHUB_OUTPUT;;
           aarch64) echo "arch=arm64" >> $GITHUB_OUTPUT;;
-          *) echo "unsupported architecture: $(uname -m)"; exit 1;;
+          *) echo "Unsupported architecture: $(uname -m)"; exit 1;;
         esac
 
     - name: retrieve version
       id: version
-      shell: bash
+      shell: bash {0}
       run: |
         if [[ "${{ inputs.version }}" = "latest" ]]; then
-          echo "version=$(curl -s https://api.github.com/repos/libbpf/bpftool/releases/latest | jq -r '.tag_name')" >> $GITHUB_OUTPUT
+          max_attempts=7
+          attempt=1
+          retry_delay=1
+          while [ -z "$version" ] && [ "$attempt" -le "$max_attempts" ]; do
+              echo "Attempt $attempt: Fetching latest version from GitHub..."
+              version=$(curl -s https://api.github.com/repos/libbpf/bpftool/releases/latest | jq -r '.tag_name | select (.!=null)')
+              if [ -z "$version" ]; then
+                  delay=$((2 ** (attempt - 1) * retry_delay))
+                  echo "Fetching latest version from GitHub failed. Retrying in $delay seconds..."
+                  sleep "$delay"
+              fi
+              attempt=$((attempt + 1))
+          done
+          if [ -z "$version" ]; then
+              echo "Fetching latest version failed after $max_attempts attempts. GitHub API might be unavailable, rerun this workflow later, exiting!"
+              exit 1
+          fi
         else
-          echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          echo "Using custom version '${{ inputs.version }}' defined by user..."
+          version=${{ inputs.version }}
         fi
+        echo "Version retrieved: '$version'"
+        echo "version=$version" >> $GITHUB_OUTPUT
 
     - name: cache download
       id: cache-download
