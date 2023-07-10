@@ -35,9 +35,11 @@ runs:
           retry_delay=1
           while [ -z "$version" ] && [ "$attempt" -le "$max_attempts" ]; do
               echo "Attempt $attempt: Fetching latest version from GitHub..."
-              version=$(curl -s https://api.github.com/repos/libbpf/bpftool/releases/latest | jq -r '.tag_name | select (.!=null)')
+              response=$(curl -s https://api.github.com/repos/libbpf/bpftool/releases/latest)
+              version=$(echo $response | jq -r '.tag_name | select (.!=null)')
               if [ -z "$version" ]; then
                   delay=$((2 ** (attempt - 1) * retry_delay))
+                  echo -e "$response\n"
                   echo "Fetching latest version from GitHub failed. Retrying in $delay seconds..."
                   sleep "$delay"
               fi
