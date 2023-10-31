@@ -10,10 +10,20 @@ on:
       - '.github/workflows/test.yaml'
 
 jobs:
-  build:
-    runs-on: ubuntu-20.04
+  test:
+    runs-on: ubuntu-latest
     steps:
     - name: Check out repository
       uses: actions/checkout@v3
     - name: Install bpftool
       uses: ./
+
+  test-authenticated:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v3
+    - name: Install bpftool
+      uses: ./
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
