@@ -68,8 +68,7 @@ runs:
       shell: bash
       run: |
         curl -s -L https://github.com/libbpf/bpftool/releases/download/${{ steps.version.outputs.version }}/bpftool-${{ steps.version.outputs.version }}-${{ steps.arch.outputs.arch }}.tar.gz | tar xz
-        chmod +x bpftool
-        mv bpftool ${{ inputs.path }}
+        sudo install bpftool ${{ inputs.path }}
 
     - name: check installation
       shell: bash
