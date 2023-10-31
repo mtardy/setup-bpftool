@@ -16,6 +16,7 @@ inputs:
     description: 'A GitHub token (e.g. secrets.GITHUB_TOKEN) to authenticate requests to GitHub API'
     required: false
 
+
 runs:
   using: "composite"
   steps:
@@ -29,16 +30,11 @@ runs:
           *) echo "Unsupported architecture: $(uname -m)"; exit 1;;
         esac
 
-    - name: set authentication header
-      shell: bash
-      run: |
-        if [ -n "${{ inputs.token }}" ]; then
-          echo "AUTH_HEADER=authorization: Bearer ${{ inputs.token }}" >> $GITHUB_ENV
-        fi
-
     - name: retrieve version
       id: version
       shell: bash {0}
+      env:
+        AUTH_TOKEN: ${{ inputs.token }} # for param expansion https://superuser.com/a/802544/809620
       run: |
         if [[ "${{ inputs.version }}" = "latest" ]]; then
           max_attempts=7
@@ -46,7 +42,7 @@ runs:
           retry_delay=1
           while [ -z "$version" ]; do
               echo "Attempt $attempt: Fetching latest version from GitHub..."
-              response=$(curl -s ${AUTH_HEADER:+ -H "$AUTH_HEADER"} https://api.github.com/repos/libbpf/bpftool/releases/latest)
+              response=$(curl -v ${AUTH_TOKEN:+ -H "authorization: Bearer $AUTH_TOKEN"} https://api.github.com/repos/libbpf/bpftool/releases/latest)
               version=$(echo $response | jq -r '.tag_name | select (.!=null)')
               attempt=$((attempt + 1))
               if [ -z "$version" ]; then
@@ -79,9 +75,11 @@ runs:
 
     - name: download
       if: steps.cache-download.outputs.cache-hit != 'true'
+      env:
+        AUTH_TOKEN: ${{ inputs.token }} # for param expansion https://superuser.com/a/802544/809620
       shell: bash
       run: |
-        curl -s -L ${AUTH_HEADER:+ -H "$AUTH_HEADER"} https://github.com/libbpf/bpftool/releases/download/${{ steps.version.outputs.version }}/bpftool-${{ steps.version.outputs.version }}-${{ steps.arch.outputs.arch }}.tar.gz | tar xz
+        curl -v -L ${AUTH_TOKEN:+ -H "authorization: Bearer $AUTH_TOKEN"} https://github.com/libbpf/bpftool/releases/download/${{ steps.version.outputs.version }}/bpftool-${{ steps.version.outputs.version }}-${{ steps.arch.outputs.arch }}.tar.gz | tar xz
         sudo install bpftool ${{ inputs.path }}
 
     - name: check installation
