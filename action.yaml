@@ -33,9 +33,13 @@ runs:
       shell: bash
       run: |
         if [ -n "${{ inputs.token }}" ]; then
-          echo "AUTH_HEADER_OPTION=--header 'authorization: Bearer ${{ inputs.token }}'" >> $GITHUB_ENV
+          echo "AUTH_HEADER=authorization: Bearer ${{ inputs.token }}" >> $GITHUB_ENV
         fi
-
+    - name: try rate limiting
+      shell: bash
+      run: |
+        curl -v ${AUTH_HEADER:+ -H "$AUTH_HEADER"} https://api.github.com/user
+        exit 1
 
     - name: retrieve version
       id: version
@@ -47,7 +51,7 @@ runs:
           retry_delay=1
           while [ -z "$version" ]; do
               echo "Attempt $attempt: Fetching latest version from GitHub..."
-              response=$(curl -s $AUTH_HEADER_OPTION https://api.github.com/repos/libbpf/bpftool/releases/latest)
+              response=$(curl -s ${AUTH_HEADER:+ -H "$AUTH_HEADER"} https://api.github.com/repos/libbpf/bpftool/releases/latest)
               version=$(echo $response | jq -r '.tag_name | select (.!=null)')
               attempt=$((attempt + 1))
               if [ -z "$version" ]; then
