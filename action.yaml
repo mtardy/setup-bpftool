@@ -5,13 +5,17 @@ branding:
   color: 'gray-dark'
 inputs:
   version:
-    description: 'Version of bpftool'
+    description: 'Version of bpftool to install'
     required: false
     default: 'latest'
   path:
     description: 'Installation path'
     required: false
     default: '/usr/local/bin'
+  token:
+    description: 'A GitHub token (e.g. secrets.GITHUB_TOKEN) to authenticate requests to GitHub API'
+    required: false
+
 runs:
   using: "composite"
   steps:
@@ -25,6 +29,14 @@ runs:
           *) echo "Unsupported architecture: $(uname -m)"; exit 1;;
         esac
 
+    - name: set authentication header
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.token }}" ]; then
+          echo "AUTH_HEADER_OPTION=--header 'authorization: Bearer ${{ inputs.token }}'" >> $GITHUB_ENV
+        fi
+
+
     - name: retrieve version
       id: version
       shell: bash {0}
@@ -33,17 +45,20 @@ runs:
           max_attempts=7
           attempt=1
           retry_delay=1
-          while [ -z "$version" ] && [ "$attempt" -le "$max_attempts" ]; do
+          while [ -z "$version" ]; do
               echo "Attempt $attempt: Fetching latest version from GitHub..."
-              response=$(curl -s https://api.github.com/repos/libbpf/bpftool/releases/latest)
+              response=$(curl -s $AUTH_HEADER_OPTION https://api.github.com/repos/libbpf/bpftool/releases/latest)
               version=$(echo $response | jq -r '.tag_name | select (.!=null)')
+              attempt=$((attempt + 1))
               if [ -z "$version" ]; then
+                  if [ "$attempt" -gt "$max_attempts" ]; then
+                      break
+                  fi
                   delay=$((2 ** (attempt - 1) * retry_delay))
                   echo -e "$response\n"
                   echo "Fetching latest version from GitHub failed. Retrying in $delay seconds..."
                   sleep "$delay"
               fi
-              attempt=$((attempt + 1))
           done
           if [ -z "$version" ]; then
               echo "Fetching latest version failed after $max_attempts attempts. GitHub API might be unavailable, rerun this workflow later, exiting!"
@@ -67,7 +82,7 @@ runs:
       if: steps.cache-download.outputs.cache-hit != 'true'
       shell: bash
       run: |
-        curl -s -L https://github.com/libbpf/bpftool/releases/download/${{ steps.version.outputs.version }}/bpftool-${{ steps.version.outputs.version }}-${{ steps.arch.outputs.arch }}.tar.gz | tar xz
+        curl -s -L $AUTH_HEADER_OPTION https://github.com/libbpf/bpftool/releases/download/${{ steps.version.outputs.version }}/bpftool-${{ steps.version.outputs.version }}-${{ steps.arch.outputs.arch }}.tar.gz | tar xz
         sudo install bpftool ${{ inputs.path }}
 
     - name: check installation
