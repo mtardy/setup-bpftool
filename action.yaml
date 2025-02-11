@@ -68,7 +68,7 @@ runs:
 
     - name: cache download
       id: cache-download
-      uses: actions/cache@704facf57e6136b1bc63b828d79edcd491f0ee84 # v3.3.2
+      uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
       with:
         path: ${{ inputs.path }}/bpftool
         key: bpftool-${{ steps.version.outputs.version }}-${{ steps.arch.outputs.arch }}
